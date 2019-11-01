@@ -1,0 +1,18 @@
+#!/bin/bash
+agents=16
+nodenum=$NODES
+codelocation=$EXECUTABLE
+
+declare -a workloads=($WORKLOADS)  
+
+
+for workload in "${workloads[@]}"; do
+
+wlloc="$DATADIR/${workload}/"
+locksperwh=$(cat ${wlloc}/max-locks-per-wh.meta | grep -oP '^[^0-9]*\K[0-9]+')
+numwhs=$(ls ${wlloc}/*.csv | sed 's!.*/!!' | grep -o -E '[0-9]+' | sort -nr | head -1 |  sed 's/^0*//')
+
+$codelocation --warehouses=${numwhs} --processespernode=${agents} --locksperwh=${locksperwh} --localworkloadsize=1000000 --workloadlocation=${wlloc} --numberofnodes=${nodenum}
+
+done
+

@@ -1,0 +1,6 @@
+matplotlib
+palettable
+pandas
+scipy
+seaborn
+tables

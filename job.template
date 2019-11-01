@@ -1,0 +1,36 @@
+#!/bin/bash -l
+#SBATCH --job-name=$JOBNAME
+#SBATCH --time=$TOTALTIME
+#SBATCH --nodes=$NODES
+#SBATCH --ntasks-per-node=32
+#SBATCH --ntasks-per-core=1
+#SBATCH --partition=normal
+#SBATCH --constraint=mc
+#SBATCH --hint=nomultithread
+
+agents=16
+nodenum=$NODES
+codelocation=$EXECUTABLE
+
+#declare -a transactionalgs=("simple2pl" "waitdie"  "nowait" "timestamp")
+declare -a transactionalgs=($ALGORITHMS)
+declare -a delays=($DELAYS)  
+declare -a workloads=($WORKLOADS)  
+
+
+for workload in "${workloads[@]}"; do
+for trtype in "${transactionalgs[@]}"; do
+for delay in "${delays[@]}"; do
+
+wlloc="$DATADIR/${workload}/"
+locksperwh=$(cat ${wlloc}/max-locks-per-wh.meta | grep -oP '^[^0-9]*\K[0-9]+')
+numwhs=$(ls ${wlloc}/*.csv | sed 's!.*/!!' | grep -o -E '[0-9]+' | sort -nr | head -1 |  sed 's/^0*//')
+
+outname="out-${workload}-${numwhs}-${nodenum}-${agents}-${agents}-${delay}-${trtype}"
+
+srun $codelocation --timelimit=120 --comdelay=${delay} --warehouses=${numwhs} --processespernode=${agents} --locksperwh=${locksperwh} --socketspernode=2 --localworkloadsize=1000000 --workloadlocation=${wlloc} --logname=${outname} --${trtype} 
+
+done
+done
+done
+

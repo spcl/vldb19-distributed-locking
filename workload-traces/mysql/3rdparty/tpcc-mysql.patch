@@ -1,0 +1,830 @@
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..35358b5
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,6 @@
++*.o
++*.swp
++*.swo
++*.swq
++tpcc_load
++tpcc_start
+diff --git a/schema2/add_fkey_idx.sql b/schema2/add_fkey_idx.sql
+index 48fa5ba..e5e6822 100644
+--- a/schema2/add_fkey_idx.sql
++++ b/schema2/add_fkey_idx.sql
+@@ -2,20 +2,26 @@ SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+ SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+ 
+ 
+-ALTER TABLE district  ADD CONSTRAINT fkey_district_1 FOREIGN KEY(d_w_id) REFERENCES warehouse(w_id);
+-ALTER TABLE customer ADD CONSTRAINT fkey_customer_1 FOREIGN KEY(c_d_id, c_w_id) REFERENCES district(d_id, d_w_id);
+-ALTER TABLE history  ADD CONSTRAINT fkey_history_1 FOREIGN KEY(h_c_id, h_c_d_id, h_c_w_id) REFERENCES customer(c_id, c_d_id, c_w_id);
+-ALTER TABLE history  ADD CONSTRAINT fkey_history_2 FOREIGN KEY(h_d_id, h_w_id) REFERENCES district(d_id, d_w_id);
+-ALTER TABLE new_orders ADD CONSTRAINT fkey_new_orders_1 FOREIGN KEY(no_o_id,no_d_id,no_w_id) REFERENCES orders(o_id, o_d_id, o_w_id);
+-ALTER TABLE orders ADD CONSTRAINT fkey_orders_1 FOREIGN KEY(o_c_id,o_d_id,o_w_id) REFERENCES customer(c_id,c_d_id,c_w_id);
+-ALTER TABLE order_line ADD CONSTRAINT fkey_order_line_1 FOREIGN KEY(ol_o_id,ol_d_id,ol_w_id) REFERENCES orders(o_id, o_d_id, o_w_id);
+-ALTER TABLE order_line ADD CONSTRAINT fkey_order_line_2 FOREIGN KEY(ol_i_id,ol_supply_w_id) REFERENCES stock(s_i_id,s_w_id);
+-ALTER TABLE stock ADD CONSTRAINT fkey_stock_1 FOREIGN KEY(s_w_id) REFERENCES warehouse(w_id);
+-ALTER TABLE stock ADD CONSTRAINT fkey_stock_2 FOREIGN KEY(s_i_id) REFERENCES item(i_id);
+-
+-
+-CREATE INDEX idx_customer ON customer (c_w_id,c_d_id,c_last,c_first);
+-CREATE INDEX idx_orders ON orders (o_w_id,o_d_id,o_c_id,o_id);
++ALTER TABLE district ADD CONSTRAINT fkey_district_1 FOREIGN KEY (d_w_id) REFERENCES warehouse (w_id);
++
++ALTER TABLE customer ADD CONSTRAINT fkey_customer_1 FOREIGN KEY (c_w_id, c_d_id) REFERENCES district (d_w_id, d_id);
++
++ALTER TABLE history ADD CONSTRAINT fkey_history_1 FOREIGN KEY (h_c_w_id, h_c_d_id, h_c_id) REFERENCES customer (c_w_id, c_d_id, c_id);
++ALTER TABLE history ADD CONSTRAINT fkey_history_2 FOREIGN KEY (h_w_id, h_d_id) REFERENCES district (d_w_id, d_id);
++
++ALTER TABLE new_orders ADD CONSTRAINT fkey_new_orders_1 FOREIGN KEY (no_w_id, no_d_id, no_o_id) REFERENCES orders (o_w_id, o_d_id, o_id);
++
++ALTER TABLE orders ADD CONSTRAINT fkey_orders_1 FOREIGN KEY (o_w_id, o_d_id, o_c_id) REFERENCES customer (c_w_id, c_d_id, c_id);
++
++ALTER TABLE order_line ADD CONSTRAINT fkey_order_line_1 FOREIGN KEY (ol_w_id, ol_d_id, ol_o_id) REFERENCES orders (o_w_id, o_d_id, o_id);
++ALTER TABLE order_line ADD CONSTRAINT fkey_order_line_2 FOREIGN KEY (ol_supply_w_id, ol_i_id) REFERENCES stock (s_w_id, s_i_id);
++
++ALTER TABLE stock ADD CONSTRAINT fkey_stock_1 FOREIGN KEY (s_w_id) REFERENCES warehouse (w_id);
++ALTER TABLE stock ADD CONSTRAINT fkey_stock_2 FOREIGN KEY (s_i_id) REFERENCES item (i_id);
++
++
++CREATE INDEX idx_customer ON customer (c_w_id, c_d_id, c_last, c_first);
++CREATE INDEX idx_orders ON orders (o_w_id, o_d_id, o_c_id, o_id);
+ 
+ 
+ SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+diff --git a/schema2/create_table.sql b/schema2/create_table.sql
+index 217ec80..b679457 100644
+--- a/schema2/create_table.sql
++++ b/schema2/create_table.sql
+@@ -1,142 +1,151 @@
+ SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+ SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+ 
+-drop table if exists warehouse;
+-
+-create table warehouse (
+-w_id smallint not null,
+-w_name varchar(10), 
+-w_street_1 varchar(20), 
+-w_street_2 varchar(20), 
+-w_city varchar(20), 
+-w_state char(2), 
+-w_zip char(9), 
+-w_tax decimal(4,2), 
+-w_ytd decimal(12,2) ) TYPE=InnoDB;
+-
+-drop table if exists district;
+-
+-create table district (
+-d_id tinyint not null, 
+-d_w_id smallint not null, 
+-d_name varchar(10), 
+-d_street_1 varchar(20), 
+-d_street_2 varchar(20), 
+-d_city varchar(20), 
+-d_state char(2), 
+-d_zip char(9), 
+-d_tax decimal(4,2), 
+-d_ytd decimal(12,2), 
+-d_next_o_id int ) TYPE=InnoDB;
+-
+-drop table if exists customer;
+-
+-create table customer (
+-c_id int not null, 
+-c_d_id tinyint not null,
+-c_w_id smallint not null, 
+-c_first varchar(16), 
+-c_middle char(2), 
+-c_last varchar(16), 
+-c_street_1 varchar(20), 
+-c_street_2 varchar(20), 
+-c_city varchar(20), 
+-c_state char(2), 
+-c_zip char(9), 
+-c_phone char(16), 
+-c_since datetime, 
+-c_credit char(2), 
+-c_credit_lim bigint, 
+-c_discount decimal(4,2), 
+-c_balance decimal(12,2), 
+-c_ytd_payment decimal(12,2), 
+-c_payment_cnt smallint, 
+-c_delivery_cnt smallint, 
+-c_data text ) TYPE=InnoDB;
+-
+-drop table if exists history;
+-
+-create table history (
+-h_c_id int, 
+-h_c_d_id tinyint, 
+-h_c_w_id smallint,
+-h_d_id tinyint,
+-h_w_id smallint,
+-h_date datetime,
+-h_amount decimal(6,2), 
+-h_data varchar(24) ) TYPE=InnoDB;
+-
+-drop table if exists new_orders;
+-
+-create table new_orders (
+-no_o_id int not null,
+-no_d_id tinyint not null,
+-no_w_id smallint not null) TYPE=InnoDB;
+-
+-drop table if exists orders;
+-
+-create table orders (
+-o_id int not null, 
+-o_d_id tinyint not null, 
+-o_w_id smallint not null,
+-o_c_id int,
+-o_entry_d datetime,
+-o_carrier_id tinyint,
+-o_ol_cnt tinyint, 
+-o_all_local tinyint ) TYPE=InnoDB;
+-
+-drop table if exists order_line;
+-
+-create table order_line ( 
+-ol_o_id int not null, 
+-ol_d_id tinyint not null,
+-ol_w_id smallint not null,
+-ol_number tinyint not null,
+-ol_i_id int, 
+-ol_supply_w_id smallint,
+-ol_delivery_d datetime, 
+-ol_quantity tinyint, 
+-ol_amount decimal(6,2), 
+-ol_dist_info char(24) ) TYPE=InnoDB;
+-
+-drop table if exists item;
+-
+-create table item (
+-i_id int not null, 
+-i_im_id int, 
+-i_name varchar(24), 
+-i_price decimal(5,2), 
+-i_data varchar(50) ) TYPE=InnoDB;
+-
+-drop table if exists stock;
+-
+-create table stock (
+-s_i_id int not null, 
+-s_w_id smallint not null, 
+-s_quantity smallint, 
+-s_dist_01 char(24), 
+-s_dist_02 char(24),
+-s_dist_03 char(24),
+-s_dist_04 char(24), 
+-s_dist_05 char(24), 
+-s_dist_06 char(24), 
+-s_dist_07 char(24), 
+-s_dist_08 char(24), 
+-s_dist_09 char(24), 
+-s_dist_10 char(24), 
+-s_ytd decimal(8,0), 
+-s_order_cnt smallint, 
+-s_remote_cnt smallint,
+-s_data varchar(50) ) TYPE=InnoDB;
++DROP TABLE IF EXISTS warehouse;
++
++CREATE TABLE warehouse (
++    w_id SMALLINT NOT NULL,
++    w_name VARCHAR(10),
++    w_street_1 VARCHAR(20),
++    w_street_2 VARCHAR(20),
++    w_city VARCHAR(20),
++    w_state CHAR(2),
++    w_zip CHAR(9),
++    w_tax DECIMAL(4, 2),
++    w_ytd DECIMAL(12, 2)
++) ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS district;
++
++CREATE TABLE district (
++    d_id TINYINT NOT NULL,
++    d_w_id SMALLINT NOT NULL,
++    d_name VARCHAR(10),
++    d_street_1 VARCHAR(20),
++    d_street_2 VARCHAR(20),
++    d_city VARCHAR(20),
++    d_state CHAR(2),
++    d_zip CHAR(9),
++    d_tax DECIMAL(4, 2),
++    d_ytd DECIMAL(12, 2),
++    d_next_o_id INT
++) ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS customer;
++
++CREATE TABLE customer (
++    c_id INT NOT NULL,
++    c_d_id TINYINT NOT NULL,
++    c_w_id SMALLINT NOT NULL,
++    c_first VARCHAR(16),
++    c_middle CHAR(2),
++    c_last VARCHAR(16),
++    c_street_1 VARCHAR(20),
++    c_street_2 VARCHAR(20),
++    c_city VARCHAR(20),
++    c_state CHAR(2),
++    c_zip CHAR(9),
++    c_phone CHAR(16),
++    c_since DATETIME,
++    c_credit CHAR(2),
++    c_credit_lim bigint,
++    c_discount DECIMAL(4, 2),
++    c_balance DECIMAL(12, 2),
++    c_ytd_payment DECIMAL(12, 2),
++    c_payment_cnt SMALLINT,
++    c_delivery_cnt SMALLINT,
++    c_data text
++) ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS history;
++
++CREATE TABLE history (
++    h_c_id INT,
++    h_c_d_id TINYINT,
++    h_c_w_id SMALLINT,
++    h_d_id TINYINT,
++    h_w_id SMALLINT,
++    h_date DATETIME,
++    h_amount DECIMAL(6, 2),
++    h_data VARCHAR(24)
++) ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS new_orders;
++
++CREATE TABLE new_orders (
++    no_o_id INT NOT NULL,
++    no_d_id TINYINT NOT NULL,
++    no_w_id SMALLINT NOT NULL)
++    ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS orders;
++
++CREATE TABLE orders (
++    o_id INT NOT NULL,
++    o_d_id TINYINT NOT NULL,
++    o_w_id SMALLINT NOT NULL,
++    o_c_id INT,
++    o_entry_d DATETIME,
++    o_carrier_id TINYINT,
++    o_ol_cnt TINYINT,
++    o_all_local TINYINT
++) ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS order_line;
++
++CREATE TABLE order_line (
++    ol_o_id INT NOT NULL,
++    ol_d_id TINYINT NOT NULL,
++    ol_w_id SMALLINT NOT NULL,
++    ol_number TINYINT NOT NULL,
++    ol_i_id INT,
++    ol_supply_w_id SMALLINT,
++    ol_delivery_d DATETIME,
++    ol_quantity TINYINT,
++    ol_amount DECIMAL(6, 2),
++    ol_dist_info CHAR(24)
++) ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS item;
++
++CREATE TABLE item (
++    i_id INT NOT NULL,
++    i_im_id INT,
++    i_name VARCHAR(24),
++    i_price DECIMAL(5, 2),
++    i_data VARCHAR(50)
++) ENGINE=InnoDB;
++
++DROP TABLE IF EXISTS stock;
++
++CREATE TABLE stock (
++    s_i_id INT NOT NULL,
++    s_w_id SMALLINT NOT NULL,
++    s_quantity SMALLINT,
++    s_dist_01 CHAR(24),
++    s_dist_02 CHAR(24),
++    s_dist_03 CHAR(24),
++    s_dist_04 CHAR(24),
++    s_dist_05 CHAR(24),
++    s_dist_06 CHAR(24),
++    s_dist_07 CHAR(24),
++    s_dist_08 CHAR(24),
++    s_dist_09 CHAR(24),
++    s_dist_10 CHAR(24),
++    s_ytd DECIMAL(8, 0),
++    s_order_cnt SMALLINT,
++    s_remote_cnt SMALLINT,
++    s_data VARCHAR(50)
++) ENGINE=InnoDB;
+ 
+ ALTER TABLE warehouse ADD CONSTRAINT pkey_warehouse PRIMARY KEY(w_id);
+-ALTER TABLE district  ADD CONSTRAINT pkey_district  PRIMARY KEY(d_id, d_w_id);
+-ALTER TABLE customer  ADD CONSTRAINT pkey_customer  PRIMARY KEY(c_id, c_d_id, c_w_id);
+-ALTER TABLE new_orders ADD CONSTRAINT pkey_new_orders PRIMARY KEY(no_o_id, no_d_id, no_w_id);
+-ALTER TABLE orders    ADD CONSTRAINT pkey_orders    PRIMARY KEY(o_id, o_d_id, o_w_id);
+-ALTER TABLE order_line ADD CONSTRAINT pkey_order_line PRIMARY KEY(ol_o_id, ol_d_id, ol_w_id, ol_number);
++ALTER TABLE district ADD CONSTRAINT pkey_district PRIMARY KEY(d_w_id, d_id);
++ALTER TABLE customer ADD CONSTRAINT pkey_customer PRIMARY KEY(c_w_id, c_d_id, c_id);
++ALTER TABLE new_orders ADD CONSTRAINT pkey_new_orders PRIMARY KEY(no_w_id, no_d_id, no_o_id);
++ALTER TABLE orders ADD CONSTRAINT pkey_orders PRIMARY KEY(o_w_id, o_d_id, o_id);
++ALTER TABLE order_line ADD CONSTRAINT pkey_order_line PRIMARY KEY(ol_w_id, ol_d_id, ol_o_id, ol_number);
+ ALTER TABLE item ADD CONSTRAINT pkey_item PRIMARY KEY(i_id);
+-ALTER TABLE stock ADD CONSTRAINT pkey_stock PRIMARY KEY(s_i_id,s_w_id);
++ALTER TABLE stock ADD CONSTRAINT pkey_stock PRIMARY KEY(s_w_id, s_i_id);
+ 
+ SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+ SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
+diff --git a/schema2/drop_cons.sql b/schema2/drop_cons.sql
+index bac8791..0608416 100644
+--- a/schema2/drop_cons.sql
++++ b/schema2/drop_cons.sql
+@@ -1,10 +1,10 @@
+ SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+ SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+ 
+-ALTER TABLE district  DROP FOREIGN KEY fkey_district_1;
++ALTER TABLE district DROP FOREIGN KEY fkey_district_1;
+ ALTER TABLE customer DROP FOREIGN KEY fkey_customer_1;
+-ALTER TABLE history  DROP FOREIGN KEY fkey_history_1;
+-ALTER TABLE history  DROP FOREIGN KEY fkey_history_2;
++ALTER TABLE history DROP FOREIGN KEY fkey_history_1;
++ALTER TABLE history DROP FOREIGN KEY fkey_history_2;
+ ALTER TABLE new_orders DROP FOREIGN KEY fkey_new_orders_1;
+ ALTER TABLE orders DROP FOREIGN KEY fkey_orders_1;
+ ALTER TABLE order_line DROP FOREIGN KEY fkey_order_line_1;
+diff --git a/src/Makefile b/src/Makefile
+index abdbaea..5c8051e 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -4,7 +4,7 @@
+ 
+ 
+ 
+-LIBS=		`mysql_config --libs_r` -lrt
++LIBS=		`mysql_config --libs_r` -lrt -pthread -lm
+ 
+ INC=		-I. `mysql_config --include`
+ 
+diff --git a/src/delivery.c b/src/delivery.c
+index b5266db..af10eca 100644
+--- a/src/delivery.c
++++ b/src/delivery.c
+@@ -33,6 +33,8 @@ int delivery( int t_num,
+ 
+ 	int proceed = 0;
+ 
++	TraceWithTimeStamp("start: trx delivery on home w_id %i\n", w_id);
++
+ 	MYSQL_STMT*   mysql_stmt;
+         MYSQL_BIND    param[4];
+         MYSQL_BIND    column[1];
+@@ -224,11 +226,15 @@ int delivery( int t_num,
+ 		/* printf("D: %d, O: %d, time: %d\n", d_id, o_id, tad); */
+ 
+ 	}
++
++	TraceWithTimeStamp("end: trx delivery on home w_id %i\n", w_id);
++
+ 	/*EXEC_SQL COMMIT WORK;*/
+ 	return (1);
+ 
+ sqlerr:
+-        fprintf(stderr, "delivery %d:%d\n",t_num,proceed);
++	TraceWithTimeStamp("end: trx delivery on home w_id %i\n", w_id);
++        fprintf(stderr, "delivery %d:%d (%s)\n",t_num,proceed, mysql_error(ctx[t_num]));
+ 	error(ctx[t_num],mysql_stmt);
+         /*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+ 	/*EXEC_SQL ROLLBACK WORK;*/
+diff --git a/src/main.c b/src/main.c
+index 75b0ef7..36ce66a 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -503,7 +503,6 @@ int main( int argc, char *argv[] )
+   }
+ #endif
+ 
+-  printf("\nSTOPPING THREADS");
+   activate_transaction = 0;
+ 
+   /* wait threads' ending and close connections*/
+@@ -511,6 +510,8 @@ int main( int argc, char *argv[] )
+     pthread_join( t[i], NULL );
+   }
+ 
++  printf("\nSTOPPING THREADS");
++
+   printf("\n");
+ 
+   free(ctx);
+@@ -807,6 +808,49 @@ int thread_main (thread_arg* arg)
+   if( mysql_stmt_prepare(stmt[t_num][33], "SELECT DISTINCT ol_i_id FROM order_line WHERE ol_w_id = ? AND ol_d_id = ? AND ol_o_id < ? AND ol_o_id >= (? - 20)", 113) ) goto sqlerr;
+   if( mysql_stmt_prepare(stmt[t_num][34], "SELECT count(*) FROM stock WHERE s_w_id = ? AND s_i_id = ? AND s_quantity < ?", 77) ) goto sqlerr;
+ 
++  // Update database statistics
++  {
++    const char * queries [] =
++        {
++          "ANALYZE TABLE customer",
++          "ANALYZE TABLE district",
++          "ANALYZE TABLE history",
++          "ANALYZE TABLE item",
++          "ANALYZE TABLE new_orders",
++          "ANALYZE TABLE order_line",
++          "ANALYZE TABLE orders",
++          "ANALYZE TABLE stock",
++          "ANALYZE TABLE warehouse"
++        };
++    size_t i;
++    for (i = 0; i < sizeof(queries)/sizeof(queries[0]); i++)
++    {
++      if (mysql_query(ctx[t_num], queries[i])) goto sqlerr;
++      MYSQL_RES *result = mysql_use_result(ctx[t_num]);
++      mysql_free_result(result);
++    }
++
++  }
++  // Print all session variables
++  {
++    if (mysql_query(ctx[t_num], "SELECT variable_name, variable_value FROM information_schema.session_variables")) goto sqlerr;
++    MYSQL_RES *result = mysql_use_result(ctx[t_num]);
++
++    if (mysql_num_fields(result) != 2)
++    {
++      printf("Unexpected result schema.\n");
++      exit(1);
++    }
++
++    MYSQL_ROW row;
++    while (row = mysql_fetch_row(result))
++    {
++        TraceWithTimeStamp("session variable %s = %s\n", row[0], row[1]);
++    }
++
++    mysql_free_result(result);
++  }
++
+   r = driver(t_num);
+ 
+   /* EXEC SQL COMMIT WORK; */
+diff --git a/src/neword.c b/src/neword.c
+index 27df6e9..70776d7 100644
+--- a/src/neword.c
++++ b/src/neword.c
+@@ -112,6 +112,8 @@ int neword( int t_num,
+         gettimestamp(datetime, STRFTIME_FORMAT, TIMESTAMP_LEN);
+ 	clk_start = clock_gettime(CLOCK_REALTIME, &tbuf_start );
+ 
++	TraceWithTimeStamp("start: trx neword on home w_id %i\n", w_id);
++
+ 	proceed = 1;
+ 	/*EXEC_SQL SELECT c_discount, c_last, c_credit, w_tax
+ 		INTO :c_discount, :c_last, :c_credit, :w_tax
+@@ -355,6 +357,9 @@ int neword( int t_num,
+ 		        WHERE s_i_id = :ol_i_id 
+ 			AND s_w_id = :ol_supply_w_id
+ 			FOR UPDATE;*/
++
++		TraceWithTimeStamp("start: selecting from stock for ware house %i (%s)\n", ol_supply_w_id, ol_supply_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][6];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 2); /* initialize */
+@@ -414,6 +419,7 @@ int neword( int t_num,
+ 		}
+ 		mysql_stmt_free_result(mysql_stmt);
+ 
++		TraceWithTimeStamp("end: selecting from stock\n");
+ 
+ 		pick_dist_info(ol_dist_info, d_id);	/* pick correct
+ 							 * s_dist_xx */
+@@ -439,6 +445,9 @@ int neword( int t_num,
+ 		/*EXEC_SQL UPDATE stock SET s_quantity = :s_quantity
+ 		        WHERE s_i_id = :ol_i_id 
+ 			AND s_w_id = :ol_supply_w_id;*/
++
++		TraceWithTimeStamp("start: updating stock for ware house %i (%s)\n", ol_supply_w_id, ol_supply_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][7];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 3); /* initialize */
+@@ -451,6 +460,7 @@ int neword( int t_num,
+ 		if( mysql_stmt_bind_param(mysql_stmt, param) ) goto sqlerr;
+ 		if( mysql_stmt_execute(mysql_stmt) ) goto sqlerr;
+ 
++		TraceWithTimeStamp("end: updating stock\n");
+ 
+ 		ol_amount = ol_quantity * i_price * (1 + w_tax + d_tax) * (1 - c_discount);
+ 		amt[ol_num_seq[ol_number - 1]] = ol_amount;
+@@ -468,6 +478,9 @@ int neword( int t_num,
+ 			VALUES (:o_id, :d_id, :w_id, :ol_number, :ol_i_id,
+ 				:ol_supply_w_id, :ol_quantity, :ol_amount,
+ 				:ol_dist_info);*/
++
++		TraceWithTimeStamp("start: inserting into order_line for ware house %i (%s)\n", ol_supply_w_id, ol_supply_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][8];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 9); /* initialize */
+@@ -493,6 +506,7 @@ int neword( int t_num,
+ 		if( mysql_stmt_bind_param(mysql_stmt, param) ) goto sqlerr;
+ 		if( mysql_stmt_execute(mysql_stmt) ) goto sqlerr;
+ 
++		TraceWithTimeStamp("end: inserting into order_line\n");
+ 
+ 	}			/* End Order Lines */
+ 
+@@ -501,6 +515,8 @@ int neword( int t_num,
+ 	fflush(stdout);
+ #endif
+ 
++	TraceWithTimeStamp("end: trx neword on home w_id %i\n", w_id);
++
+ 	/*EXEC_SQL COMMIT WORK;*/
+ 	if( mysql_commit(ctx[t_num]) ) goto sqlerr;
+ 	clk1 = clock_gettime(CLOCK_REALTIME, &tbuf1 );
+@@ -512,6 +528,9 @@ int neword( int t_num,
+ 	return (1);
+ 
+ invaliditem:
++
++	TraceWithTimeStamp("end: trx neword on home w_id %i\n", w_id);
++
+ 	/*EXEC_SQL ROLLBACK WORK;*/
+ 	mysql_rollback(ctx[t_num]);
+ 
+@@ -519,7 +538,8 @@ invaliditem:
+ 	return (1); /* OK? */
+ 
+ sqlerr:
+-	fprintf(stderr,"neword %d:%d\n",t_num,proceed);
++	TraceWithTimeStamp("end: trx neword on home w_id %i\n", w_id);
++	fprintf(stderr,"neword %d:%d (%s)\n",t_num,proceed, mysql_error(ctx[t_num]));
+       	error(ctx[t_num],mysql_stmt);
+ 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+ 	/*EXEC_SQL ROLLBACK WORK;*/
+diff --git a/src/ordstat.c b/src/ordstat.c
+index 19e9da4..173d9ff 100644
+--- a/src/ordstat.c
++++ b/src/ordstat.c
+@@ -52,6 +52,8 @@ int ordstat( int t_num,
+         MYSQL_BIND    param[6];
+         MYSQL_BIND    column[5];
+ 
++	TraceWithTimeStamp("start: trx ordstat on home w_id %i\n", w_id);
++
+ 	/*EXEC SQL WHENEVER NOT FOUND GOTO sqlerr;*/
+ 	/*EXEC SQL WHENEVER SQLERROR GOTO sqlerr;*/
+ 
+@@ -318,6 +320,8 @@ int ordstat( int t_num,
+ 	}
+ 
+ done:
++	TraceWithTimeStamp("end: trx ordstat on home w_id %i\n", w_id);
++
+ 	/*EXEC_SQL CLOSE c_items;*/
+         /*EXEC_SQL COMMIT WORK;*/
+ 	if( mysql_commit(ctx[t_num]) ) goto sqlerr;
+@@ -325,7 +329,8 @@ done:
+ 	return (1);
+ 
+ sqlerr:
+-        fprintf(stderr, "ordstat %d:%d\n",t_num,proceed);
++	TraceWithTimeStamp("end: trx ordstat on home w_id %i\n", w_id);
++        fprintf(stderr, "ordstat %d:%d (%s)\n",t_num,proceed, mysql_error(ctx[t_num]));
+ 	error(ctx[t_num],mysql_stmt);
+         /*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+ 	/*EXEC_SQL ROLLBACK WORK;*/
+diff --git a/src/payment.c b/src/payment.c
+index 6d47064..9f7f016 100644
+--- a/src/payment.c
++++ b/src/payment.c
+@@ -82,6 +82,8 @@ int payment( int t_num,
+ 
+ 	gettimestamp(datetime, STRFTIME_FORMAT, TIMESTAMP_LEN);
+ 
++	TraceWithTimeStamp("start: trx payment on home w_id %i\n", w_id);
++
+ 	proceed = 1;
+ 	/*EXEC_SQL UPDATE warehouse SET w_ytd = w_ytd + :h_amount
+ 	  WHERE w_id =:w_id;*/
+@@ -222,6 +224,9 @@ int payment( int t_num,
+ 			WHERE c_w_id = :c_w_id
+ 			AND c_d_id = :c_d_id
+ 		        AND c_last = :c_last;*/
++
++		TraceWithTimeStamp("start: selecting from customer for ware house %i (%s)\n", c_w_id, c_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][13];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 3); /* initialize */
+@@ -251,6 +256,8 @@ int payment( int t_num,
+ 		}
+ 		mysql_stmt_free_result(mysql_stmt);
+ 
++		TraceWithTimeStamp("end: selecting from customer\n");
++
+ 		/*EXEC_SQL DECLARE c_byname_p CURSOR FOR
+ 		        SELECT c_id
+ 		        FROM customer
+@@ -260,6 +267,9 @@ int payment( int t_num,
+ 			ORDER BY c_first;
+ 
+ 			EXEC_SQL OPEN c_byname_p;*/
++
++		TraceWithTimeStamp("start: selecting from customer for ware house %i (%s)\n", c_w_id, c_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][14];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 3); /* initialize */
+@@ -298,6 +308,7 @@ int payment( int t_num,
+ 		/*EXEC_SQL CLOSE c_byname_p; */
+ 		mysql_stmt_free_result(mysql_stmt);
+ 
++		TraceWithTimeStamp("end: selecting from customer\n");
+ 	}
+ 
+ 	proceed = 6;
+@@ -314,6 +325,9 @@ int payment( int t_num,
+ 	        AND c_d_id = :c_d_id 
+ 		AND c_id = :c_id
+ 		FOR UPDATE;*/
++
++		TraceWithTimeStamp("start: selecting (for update) from customer for ware house %i (%s)\n", c_w_id, c_w_id == w_id ? "local" : "remote");
++
+ 	mysql_stmt = stmt[t_num][15];
+ 
+ 	memset(param, 0, sizeof(MYSQL_BIND) * 3); /* initialize */
+@@ -381,6 +395,8 @@ int payment( int t_num,
+         mysql_stmt_free_result(mysql_stmt);
+ 
+ 
++		TraceWithTimeStamp("end: selecting (for update) from customer \n");
++
+ 
+ 	c_balance = c_balance - h_amount;
+ 	c_credit[2] = '\0';
+@@ -392,6 +408,9 @@ int payment( int t_num,
+ 		        WHERE c_w_id = :c_w_id 
+ 			AND c_d_id = :c_d_id 
+ 			AND c_id = :c_id; */
++
++		TraceWithTimeStamp("start: selecting from customer for ware house %i (%s)\n", c_w_id, c_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][16];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 3); /* initialize */
+@@ -421,6 +440,8 @@ int payment( int t_num,
+ 		}
+ 		mysql_stmt_free_result(mysql_stmt);
+ 
++		TraceWithTimeStamp("end: selecting from customer\n");
++
+ 
+ 		sprintf(c_new_data, 
+ 			"| %4d %2d %4d %2d %4d $%7.2f %12c %24c",
+@@ -439,6 +460,9 @@ int payment( int t_num,
+ 			WHERE c_w_id = :c_w_id 
+ 			AND c_d_id = :c_d_id 
+ 			AND c_id = :c_id;*/
++
++		TraceWithTimeStamp("start: updating customer for ware house %i (%s)\n", c_w_id, c_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][17];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 5); /* initialize */
+@@ -455,6 +479,8 @@ int payment( int t_num,
+ 		param[4].buffer = &c_id;
+ 		if( mysql_stmt_bind_param(mysql_stmt, param) ) goto sqlerr;
+ 		if( mysql_stmt_execute(mysql_stmt) ) goto sqlerr;
++
++		TraceWithTimeStamp("end: updating customer for ware house\n");
+ 	} else {
+ 		proceed = 9;
+ 		/*EXEC_SQL UPDATE customer 
+@@ -462,6 +488,9 @@ int payment( int t_num,
+ 			WHERE c_w_id = :c_w_id 
+ 			AND c_d_id = :c_d_id 
+ 			AND c_id = :c_id;*/
++
++		TraceWithTimeStamp("start: updating customer for ware house %i (%s)\n", c_w_id, c_w_id == w_id ? "local" : "remote");
++
+ 		mysql_stmt = stmt[t_num][18];
+ 
+ 		memset(param, 0, sizeof(MYSQL_BIND) * 4); /* initialize */
+@@ -475,6 +504,8 @@ int payment( int t_num,
+ 		param[3].buffer = &c_id;
+ 		if( mysql_stmt_bind_param(mysql_stmt, param) ) goto sqlerr;
+ 		if( mysql_stmt_execute(mysql_stmt) ) goto sqlerr;
++
++		TraceWithTimeStamp("end: updating customer\n");
+ 	}
+ 	strncpy(h_data, w_name, 10);
+ 	h_data[10] = '\0';
+@@ -492,6 +523,9 @@ int payment( int t_num,
+ 		               :w_id, 
+ 			       :datetime,
+ 			       :h_amount, :h_data);*/
++
++	TraceWithTimeStamp("start: inserting into history for ware house %i (%s)\n", c_w_id, c_w_id == w_id ? "local" : "remote");
++
+ 	mysql_stmt = stmt[t_num][19];
+ 
+ 	memset(param, 0, sizeof(MYSQL_BIND) * 8); /* initialize */
+@@ -516,13 +550,18 @@ int payment( int t_num,
+ 	if( mysql_stmt_bind_param(mysql_stmt, param) ) goto sqlerr;
+         if( mysql_stmt_execute(mysql_stmt) ) goto sqlerr;
+ 
++	TraceWithTimeStamp("end: inserting into history\n");
++
++	TraceWithTimeStamp("end: trx payment on home w_id %i\n", w_id);
++
+ 	/*EXEC_SQL COMMIT WORK;*/
+ 	if( mysql_commit(ctx[t_num]) ) goto sqlerr;
+ 
+ 	return (1);
+ 
+ sqlerr:
+-        fprintf(stderr, "payment %d:%d\n",t_num,proceed);
++	TraceWithTimeStamp("end: trx payment on home w_id %i\n", w_id);
++        fprintf(stderr, "payment %d:%d (%s)\n",t_num,proceed, mysql_error(ctx[t_num]));
+ 	error(ctx[t_num],mysql_stmt);
+         /*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+ 	/*EXEC_SQL ROLLBACK WORK;*/
+diff --git a/src/slev.c b/src/slev.c
+index 87d9bce..0f71fe3 100644
+--- a/src/slev.c
++++ b/src/slev.c
+@@ -31,6 +31,8 @@ int slev( int t_num,
+ 	int            i_count;
+ 	int            ol_i_id;
+ 
++	TraceWithTimeStamp("start: trx slev on home w_id %i\n", w_id);
++
+ 	MYSQL_STMT*   mysql_stmt;
+         MYSQL_BIND    param[4];
+         MYSQL_BIND    column[1];
+@@ -169,9 +171,12 @@ done:
+ 	/*EXEC_SQL COMMIT WORK;*/
+ 	if( mysql_commit(ctx[t_num]) ) goto sqlerr;
+ 
++	TraceWithTimeStamp("end: trx slev on home w_id %i\n", w_id);
++
+ 	return (1);
+ 
+ sqlerr:
++	TraceWithTimeStamp("end: trx slev on home w_id %i\n", w_id);
+         fprintf(stderr,"slev\n");
+ 	error(ctx[t_num],mysql_stmt);
+         /*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+@@ -181,7 +186,8 @@ sqlerrerr:
+ 	return (0);
+ 
+ sqlerr2:
+-        fprintf(stderr,"slev\n");
++	TraceWithTimeStamp("end: trx slev on home w_id %i\n", w_id);
++        fprintf(stderr,"slev (%s)\n", mysql_error(ctx[t_num]));
+ 	error(ctx[t_num],mysql_stmt2);
+         /*EXEC SQL WHENEVER SQLERROR GOTO sqlerrerr;*/
+ 	/*EXEC_SQL ROLLBACK WORK;*/
+diff --git a/src/tpc.h b/src/tpc.h
+index 0de548b..b877d51 100644
+--- a/src/tpc.h
++++ b/src/tpc.h
+@@ -3,6 +3,9 @@
+  * definitions for tpcc loading program && transactions
+  */
+ 
++#include <stdarg.h>
++#include <time.h>
++
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+@@ -83,6 +86,17 @@ void         New_Orders();
+ void         MakeAddress();
+ void         Error();
+ 
++static void TraceWithTimeStamp(const char * const fmt, ...)
++{
++    struct timespec tb;
++    clock_gettime(CLOCK_REALTIME, &tb);
++    printf("%li %09li: ", tb.tv_sec, tb.tv_nsec);
++    va_list argp;
++    va_start(argp, fmt);
++    vprintf(fmt, argp);
++    va_end(argp);
++}
++
+ #ifdef __STDC__
+ void SetSeed (int seed);
+ int RandomNumber (int min, int max);
